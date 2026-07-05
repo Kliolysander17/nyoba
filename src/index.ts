@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 
 // 1. IMPORT (Panggil) aplikasi mini catatan yang baru kita buat
-import catatanRoute from './routes/catatan'
+import catatanRoute from './routes/catatan.js'
 
 const app = new Hono()
 app.use('*', logger())
