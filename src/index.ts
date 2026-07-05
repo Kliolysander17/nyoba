@@ -119,9 +119,13 @@ app.get('/profil/:nama', (c) => {
   return c.text(`Selamat datang di ${namaPengguna}!`)
 })
 
-serve({
-  fetch: app.fetch,
-  port: 3000
-}, (info) => {
-  console.log(`Server is running on http://localhost:${info.port}`)
-})
+if (!process.env.VERCEL) {
+  serve({
+    fetch: app.fetch,
+    port: 3000
+  }, (info) => {
+    console.log(`Server is running on http://localhost:${info.port}`)
+  })
+}
+
+export default app
