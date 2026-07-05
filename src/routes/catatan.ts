@@ -5,7 +5,16 @@ import Database from 'better-sqlite3'
 const catatan = new Hono()
 
 // 2. Membuka brankas database
-const db = new Database('data.db')
+const dbPath = process.env.VERCEL ? '/tmp/data.db' : 'data.db'
+const db = new Database(dbPath)
+
+// Bikin tabel kalau belum ada (perlu, karena /tmp selalu kosong tiap cold start)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS catatan (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    isi TEXT
+  )
+`)
 
 // Rute GET: Mengambil data
 // Perhatikan: Rutenya sekarang cukup '/' saja, tidak perlu '/catatan' lagi
