@@ -1,57 +1,66 @@
 import { Hono } from 'hono'
-import Database from 'better-sqlite3'
+import { createClient } from '@libsql/client' // 1. Senjata baru kita!
 
-// 1. Membuat "Aplikasi Mini" khusus untuk catatan
 const catatan = new Hono()
 
-// 2. Membuka brankas database
-const dbPath = process.env.VERCEL ? '/tmp/data.db' : 'data.db'
-const db = new Database(dbPath)
+const db = createClient({
+  url: 'libsql://website-nyoba-kliolysander17.aws-ap-northeast-1.turso.io',    
+  authToken: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODM0MDYzNDMsImlkIjoiMDE5ZjNiMzYtNDMwMS03NzY2LTg1ZmMtZjFkNjQ2NDk1ZDgzIiwia2lkIjoiSlZiWGRlTWhPZUVtMDlmQnlYM1lFVERNb2c2Sk8yTVk2cnd5NnMzZUNVUSIsInJpZCI6IjI3YzI0OTgwLWVlYzEtNGRjZS1hNTA5LWJjMTliMGI0YmZhNyJ9.lWqrnrhfOTSMhEGT8ZZISdMwSOExB7SLHPRgBRw4u6yV-aHn9WI2AD4cYlHp2opYzP-CtpYnuIZkswnagwc1CA' 
+})
 
-// Bikin tabel kalau belum ada (perlu, karena /tmp selalu kosong tiap cold start)
-db.exec(`
+db.execute(`
   CREATE TABLE IF NOT EXISTS catatan (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     isi TEXT
   )
 `)
 
-// Rute GET: Mengambil data
-// Perhatikan: Rutenya sekarang cukup '/' saja, tidak perlu '/catatan' lagi
-catatan.get('/', (c) => {
-  const semuaCatatan = db.prepare('SELECT * FROM catatan').all()
-  return c.json(semuaCatatan)
+catatan.get('/', async (c) => {
+  const hasil = await db.execute('SELECT * FROM catatan')
+  return c.json(hasil.rows) 
 })
 
-// Rute POST: Menambah data
 catatan.post('/', async (c) => {
   const body = await c.req.json()
-  if (!body.isi || body.isi.trim() === '')
-    return c.json({
-      pesan: 'Catatan harus memiliki isi!'
-    }, 400) 
-  const operasi = db.prepare('INSERT INTO catatan (isi) VALUES (?)').run(body.isi)
-  return c.json({ pesan: 'Catatan berhasil disimpan!', id_baru: operasi.lastInsertRowid })
+  
+  if (!body.isi || body.isi.trim() === '') {
+    return c.json({ pesan: 'Ditolak: Isi catatan tidak boleh kosong!' }, 400)
+  }
+
+  const operasi = await db.execute({
+    sql: 'INSERT INTO catatan (isi) VALUES (?)',
+    args: [body.isi]
+  })
+
+  return c.json({ 
+    pesan: 'Catatan sukses disimpan di Cloud!', 
+    id_baru: Number(operasi.lastInsertRowid) 
+  })
 })
 
-// Rute PUT: Mengubah data
 catatan.put('/:id', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json()
-  const operasi = db.prepare('UPDATE catatan SET isi = ? WHERE id = ?').run(body.isi, id)
   
-  if (operasi.changes === 0) return c.json({ pesan: 'Catatan tidak ditemukan!' }, 404)
-  return c.json({ pesan: 'Catatan berhasil diperbarui!' })
+  const operasi = await db.execute({
+    sql: 'UPDATE catatan SET isi = ? WHERE id = ?',
+    args: [body.isi, id]
+  })
+
+  if (operasi.rowsAffected === 0) return c.json({ pesan: 'Catatan tidak ditemukan!' }, 404)
+  return c.json({ pesan: 'Catatan berhasil diperbarui di Cloud!' })
 })
 
-// Rute DELETE: Menghapus data
-catatan.delete('/:id', (c) => {
+catatan.delete('/:id', async (c) => {
   const id = c.req.param('id')
-  const operasi = db.prepare('DELETE FROM catatan WHERE id = ?').run(id)
   
-  if (operasi.changes === 0) return c.json({ pesan: 'Catatan tidak ditemukan!' }, 404)
-  return c.json({ pesan: 'Catatan berhasil dihapus!' })
+  const operasi = await db.execute({
+    sql: 'DELETE FROM catatan WHERE id = ?',
+    args: [id]
+  })
+  
+  if (operasi.rowsAffected === 0) return c.json({ pesan: 'Catatan tidak ditemukan!' }, 404)
+  return c.json({ pesan: 'Catatan berhasil dihapus dari Cloud!' })
 })
 
-// 3. Mengekspor "Aplikasi Mini" ini agar bisa dipakai di file utama
 export default catatan
